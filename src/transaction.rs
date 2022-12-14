@@ -31,4 +31,3 @@ pub async fn withdraw(
 
   util::sign_submit_and_watch(&api, &call, &mut signer).await
 }
-
