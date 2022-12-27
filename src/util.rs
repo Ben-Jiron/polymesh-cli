@@ -4,7 +4,7 @@ use parity_scale_codec::Encode;
 use polymesh_api::client::{Era, Extra, ExtrinsicV4, SignedPayload, Signer};
 use polymesh_api::{Api, ChainApi, WrappedCall};
 
-const MAINNET_URL: &str = "wss://..."; // TODO: This should be a real URL
+const MAINNET_URL: &str = "wss://mainnet-rpc.polymesh.network";
 const TESTNET_URL: &str = "wss://testnet-rpc.polymesh.live";
 
 /// Get RPC URL for mainnet or testnet
@@ -41,4 +41,25 @@ pub async fn sign_submit_and_watch(
   signer.set_nonce(nonce + 1);
 
   Ok(String::from("0x") + &hex::encode(tx_hash.as_bytes()))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[tokio::test]
+  async fn it_gets_api_on_mainnet() {
+    let mainnet = true;
+    let url = url(mainnet);
+    let api = Api::new(url).await;
+    assert!(api.is_ok());
+  }
+
+  #[tokio::test]
+  async fn it_gets_api_on_testnet() {
+    let mainnet = false;
+    let url = url(mainnet);
+    let api = Api::new(url).await;
+    assert!(api.is_ok());
+  }
 }

@@ -2,12 +2,16 @@ use clap::{arg, value_parser, Command};
 
 pub fn command() -> Command {
   Command::new("polymesh-cli")
+    .about("Utilities for interacting with the Polymesh blockchain")
+    .subcommand_required(true)
     .subcommand(
       Command::new("send")
         .about("Send POLYX between accounts.")
         .args(&[
           arg!(key: -k --key <KEY> "32-byte hexadecimal private key of signing account")
-            .required(true),
+            .required_unless_present("mnemonic"),
+          arg!(mnemonic: -m --mnemonic <MNEMONIC> "BIP39 mnemonic phrase of signing account")
+            .conflicts_with("key"),
           arg!(amount: -a --amount <AMOUNT> "Amount to transfer in POLYX")
             .value_parser(value_parser!(f64))
             .required(true),
@@ -47,10 +51,20 @@ pub fn command() -> Command {
         ])
     )
     .subcommand(
+      Command::new("balance")
+        .about("Get a user's balance on mainnet or testnet (in μPOLYX)")
+        .args(&[
+          arg!(address: "SS58-formatted public address (starts with 5 on testnet or 2 on mainnet)").required(true),
+          arg!(mainnet: --mainnet "If set, returns mainnet address (starting with 2)").required(false),
+        ])
+    )
+    .subcommand(
       Command::new("secondary")
         .about("Add and remove secondary keys from primary signing account.")
+        .subcommand_required(true)
         .subcommand(
           Command::new("add")
+            .about("Add a secondary key with authorizations to an identity (must be signed by primary key)")
             .short_flag('a')
             .args(&[
               arg!(mnemonic: -m --mnemonic <MNEMONIC> "BIP39 secret mnemonic phrase for primary account")
@@ -67,6 +81,7 @@ pub fn command() -> Command {
         )
         .subcommand(
           Command::new("remove")
+            .about("Remove a secondary key from an identity (must be signed by primary key)")
             .short_flag('r')
             .args(&[
               arg!(mnemonic: -m --mnemonic <MNEMONIC> "BIP39 secret mnemonic phrase for primary account")
@@ -74,6 +89,53 @@ pub fn command() -> Command {
               arg!(who: -w --who <ADDRESS> "SS58-formatted public address of secondary key")
                 .alias("secondary")
                 .short_alias('s')
+                .required(true),
+              arg!(mainnet: --mainnet "If set, performs action on mainnet").required(false),
+            ])
+        )
+    )
+    .subcommand(
+      Command::new("staking")
+        .about("Staking utilities")
+        .subcommand_required(true)
+        .subcommand(
+          Command::new("validators")
+            .about("Get public (SS58-formatted) addresses of current validator nodes")
+            .short_flag('v')
+            .arg(arg!(mainnet: --mainnet "If set, gets operator nodes on mainnet"))
+        )
+        .subcommand(
+          Command::new("nominate")
+            .about("Declare to nominate validator nodes for the origin controller")
+            .short_flag('n')
+            .args(&[
+              arg!(key: -k --key <CONTROLLER_KEY> "The 32-byte hexadecimal signing key of controller account")
+                .alias("controller")
+                .short_alias('c')
+                .required(true),
+              arg!(validators: -v --validators <VALIDATORS> "The validator nodes to nominate (up to 24)")
+                .alias("operators")
+                .short_alias('o')
+                .num_args(1..=24)   // You can only nominate up to 24 validator nodes
+                .required(true),
+              arg!(mainnet: --mainnet "If set, performs action on mainnet").required(false),
+            ])
+        )
+        .subcommand(
+          Command::new("bond")
+            .about("Take the origin account as a stash, locking up some of its balance for staking")
+            .short_flag('b')
+            .args(&[
+              arg!(key: -k --key <STASH_KEY> "The 32-byte hexadecimal signing key of stash")
+                .alias("stash")
+                .short_alias('s')
+                .required(true),
+              arg!(controller: -c --controller <CONTROLLER_ADDR> "The public address of the controller account")
+                .required(true),
+              arg!(value: -v --value <VALUE> "The amount of the stash's balance (in POLYX) that will be locked up")
+                .alias("amount")
+                .short_alias('a')
+                .value_parser(value_parser!(f64))
                 .required(true),
               arg!(mainnet: --mainnet "If set, performs action on mainnet").required(false),
             ])

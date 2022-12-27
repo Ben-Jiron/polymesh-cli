@@ -60,9 +60,10 @@ pub async fn add(
   mainnet: bool,          // On mainnet (as opposed to testnet)?
 ) -> Result<String> {
   let secondary_key: [u8; 32] =
-    hex::decode(secondary_key.strip_prefix("0x").unwrap_or(secondary_key))?
-      .as_slice()
-      .try_into()?;
+    match hex::decode(secondary_key.strip_prefix("0x").unwrap_or(secondary_key)) {
+      Ok(v) => v.as_slice().try_into()?,
+      Err(_) => bail!("expected 32-byte hexadecimal string as secondary key, got {secondary_key}"),
+    };
   // Get PairSigners for primary and secondary keys
   let primary_pair = match <Pair as sp_core::Pair>::from_string(primary_mnemonic, None) {
     Ok(pair) => pair,
@@ -85,14 +86,14 @@ pub async fn add(
   };
   let nonce = identity_query
     .off_chain_authorization_nonce(target_id)
-    .await
-    .unwrap();
+    .await?;
   let expires_at = SystemTime::now()
     .checked_add(Duration::from_secs(expires_after))
     .unwrap_or_else(SystemTime::now)
     .duration_since(SystemTime::UNIX_EPOCH)
     .expect("logic error in getting Unix time")
-    .as_millis() as u64;
+    .as_millis()
+    .min(u64::MAX as u128) as u64;
   let auth = TargetIdAuthorization {
     target_id,
     nonce,
@@ -141,7 +142,6 @@ pub async fn remove(primary_mnemonic: &str, who: &str, mainnet: bool) -> Result<
   let url = util::url(mainnet);
   let api = Api::new(url).await?;
   let call = api.call().identity().remove_secondary_keys(vec![who])?;
-
   util::sign_submit_and_watch(&api, &call, &mut signer).await
 }
 
