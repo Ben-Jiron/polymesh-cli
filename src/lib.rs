@@ -12,6 +12,7 @@ mod transaction;
 
 pub async fn run() -> Result<String> {
   let res = match command::command().get_matches().subcommand() {
+    // Subcommand: send
     Some(("send", sub_m)) => {
       let amount_polyx = sub_m.get_one::<f64>("amount").expect("amount required");
       let amount = (*amount_polyx * 1e6) as u128; // convert POLYX to μPOLYX
@@ -29,11 +30,15 @@ pub async fn run() -> Result<String> {
         }
       }
     }
+
+    // Subcommand: sign
     Some(("sign", sub_m)) => {
       let key = sub_m.get_one::<String>("key").expect("key required");
       let payload = sub_m.get_one::<String>("payload").expect("key required");
       signing::sign_payload(key, payload).await?
     }
+
+    // Subcommand: verify
     Some(("verify", sub_m)) => {
       let address = sub_m
         .get_one::<String>("address")
@@ -46,18 +51,34 @@ pub async fn run() -> Result<String> {
         .expect("signature required");
       signing::verify_signature(signature, address, payload).to_string()
     }
+
+    // Subcommand: address
     Some(("address", sub_m)) => {
-      let key = sub_m.get_one::<String>("key").expect("key required");
       let mainnet = sub_m.get_flag("mainnet");
-      address::private_key_to_ss58check(key, mainnet)?
+      match sub_m.get_one::<String>("mnemonic") {
+        Some(mnemonic) => address::mnemonic_to_ss58check(mnemonic, mainnet, None)?,
+        None => {
+          let key = sub_m.get_one::<String>("key").expect("key required");
+          address::private_key_to_ss58check(key, mainnet)?
+        }
+      }
     }
+
+    // Subcommand: balance
     Some(("balance", sub_m)) => {
       let address = sub_m
         .get_one::<String>("address")
         .expect("address required");
       let mainnet = sub_m.get_flag("mainnet");
-      format!("{}", balance::free(address, mainnet).await?)
+      let bal = if sub_m.get_flag("staked") {
+        balance::staked(address, mainnet).await?
+      } else {
+        balance::free(address, mainnet).await?
+      };
+      format!("{}", bal)
     }
+
+    // Subcommand: secondary (i.e. Secondary keys)
     Some(("secondary", sub_m)) => match sub_m.subcommand() {
       Some(("add", sub_m)) => {
         let mnemonic = sub_m
@@ -82,6 +103,8 @@ pub async fn run() -> Result<String> {
       }
       _ => unreachable!(),
     },
+
+    // Subcommand: staking
     Some(("staking", sub_m)) => match sub_m.subcommand() {
       Some(("validators", sub_m)) => {
         let mainnet = sub_m.get_flag("mainnet");
@@ -114,6 +137,11 @@ pub async fn run() -> Result<String> {
         let value = (*value_polyx * 1e6) as u128; // convert POLYX to μPOLYX
         let mainnet = sub_m.get_flag("mainnet");
         staking::bond(stash_key, controller, value, mainnet).await?
+      }
+      Some(("withdraw", sub_m)) => {
+        let controller_key = sub_m.get_one::<String>("key").expect("controller key required");
+        let mainnet = sub_m.get_flag("mainnet");
+        staking::withdraw_unbonded(controller_key, mainnet).await?
       }
       _ => unreachable!(), // subcommand required
     },

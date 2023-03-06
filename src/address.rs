@@ -3,7 +3,7 @@ use sp_keyring::sr25519::sr25519::Pair;
 
 use polymesh_api::client::{PairSigner, Signer};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 
 /// Generate a Polymesh public address using a 32-byte private key given as a
 /// hexadecimal string
@@ -12,6 +12,25 @@ pub fn private_key_to_ss58check(priv_key: &str, mainnet: bool) -> Result<String>
     .as_slice()
     .try_into()?;
   let pair = <Pair as sp_core::Pair>::from_seed(&priv_key);
+  let signer = PairSigner::new(pair);
+  let addr = match mainnet {
+    true => signer
+      .account()
+      .to_ss58check_with_version(Ss58AddressFormatRegistry::PolymeshAccount.into()),
+    false => signer.account().to_ss58check(),
+  };
+  Ok(addr)
+}
+
+pub fn mnemonic_to_ss58check(
+  mnemonic: &str,
+  mainnet: bool,
+  password: Option<&str>,
+) -> Result<String> {
+  let pair = match <Pair as sp_core::Pair>::from_phrase(mnemonic, password) {
+    Ok((pair, _)) => pair,
+    Err(_) => bail!(format!("Invalid 12-word BIP39 mnemonic: {mnemonic}")),
+  };
   let signer = PairSigner::new(pair);
   let addr = match mainnet {
     true => signer
