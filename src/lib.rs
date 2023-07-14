@@ -138,8 +138,17 @@ pub async fn run() -> Result<String> {
         let mainnet = sub_m.get_flag("mainnet");
         staking::bond(stash_key, controller, value, mainnet).await?
       }
+      Some(("extra", sub_m)) => {
+        let stash_key = sub_m.get_one::<String>("key").expect("stash key required");
+        let value_polyx = sub_m.get_one::<f64>("value").expect("value required");
+        let value = (*value_polyx * 1e6) as u128; // convert POLYX to μPOLYX
+        let mainnet = sub_m.get_flag("mainnet");
+        staking::bond_extra(stash_key, value, mainnet).await?
+      }
       Some(("withdraw", sub_m)) => {
-        let controller_key = sub_m.get_one::<String>("key").expect("controller key required");
+        let controller_key = sub_m
+          .get_one::<String>("key")
+          .expect("controller key required");
         let mainnet = sub_m.get_flag("mainnet");
         staking::withdraw_unbonded(controller_key, mainnet).await?
       }

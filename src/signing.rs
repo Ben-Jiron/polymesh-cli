@@ -1,25 +1,20 @@
 use anyhow::{bail, Result};
 
 use parity_scale_codec::Encode;
+use polymesh_api::client::Signer;
 use sp_core::crypto::Ss58Codec;
-use sp_keyring::sr25519::sr25519::{Pair, Public, Signature};
+use sp_keyring::sr25519::sr25519::{Public, Signature};
 use sp_runtime::{traits::Verify, MultiSignature};
 
-use polymesh_api::client::{PairSigner, Signer};
+use crate::util;
 
 /// Using a private key (given as a 32-byte hexadecimal string without a `0x` prefix)
 /// and a payload (given as a hexadecimal string without a `0x` prefix), this function
 /// uses the Polymesh API to sign the payload, yielding a signature which can be
 /// validated against the user's public address (a base-64 encoded address starting with 5).
-pub async fn sign_payload(signing_addr: &str, payload: &str) -> Result<String> {
+pub async fn sign_payload(signing_key: &str, payload: &str) -> Result<String> {
   let payload = hex::decode(payload.strip_prefix("0x").unwrap_or(payload))?;
-  let signing_addr: [u8; 32] =
-    hex::decode(signing_addr.strip_prefix("0x").unwrap_or(signing_addr))?
-      .as_slice()
-      .try_into()?;
-  let pair = <Pair as sp_core::Pair>::from_seed(&signing_addr);
-  let signer = PairSigner::new(pair);
-
+  let signer = util::pairsigner_from_str(signing_key)?;
   match signer.sign(&payload).await? {
     MultiSignature::Sr25519(sig) => Ok(hex::encode(sig.encode())),
     _ => bail!("only SR25519 signatures supported"),

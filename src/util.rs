@@ -1,8 +1,9 @@
 use anyhow::{Context, Result};
 
 use parity_scale_codec::Encode;
-use polymesh_api::client::{Era, Extra, ExtrinsicV4, SignedPayload, Signer};
+use polymesh_api::client::{Era, Extra, ExtrinsicV4, PairSigner, SignedPayload, Signer};
 use polymesh_api::{Api, ChainApi, WrappedCall};
+use sp_keyring::sr25519::sr25519::Pair;
 
 const MAINNET_URL: &str = "wss://mainnet-rpc.polymesh.network";
 const TESTNET_URL: &str = "wss://testnet-rpc.polymesh.live";
@@ -17,13 +18,17 @@ pub fn url(mainnet: bool) -> &'static str {
 
 /// Decodes a 32-byte hexadecimal string into a byte slice to be used as a key/seed.
 pub fn decode_hex_key(key: &str) -> Result<[u8; 32]> {
-  Ok(
-    hex::decode(key.strip_prefix("0x").unwrap_or(key))
-      .context("invalid hex: key needs to be a 32-byte hexadecimal string")?
-      .as_slice()
-      .try_into()
-      .context("invalid length: key needs to be a 32-byte hexadecimal string")?,
-  )
+  hex::decode(key.strip_prefix("0x").unwrap_or(key))
+    .context("invalid hex: key needs to be a 32-byte hexadecimal string")?
+    .as_slice()
+    .try_into()
+    .context("invalid length: key needs to be a 32-byte hexadecimal string")
+}
+
+pub fn pairsigner_from_str(key: &str) -> Result<PairSigner<Pair>> {
+  let key = decode_hex_key(key)?;
+  let pair = <Pair as sp_core::Pair>::from_seed(&key);
+  Ok(PairSigner::new(pair))
 }
 
 /// Taking in a `WrappedCall`, encode and sign the call, then submit to the chain.

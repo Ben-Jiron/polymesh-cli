@@ -59,19 +59,13 @@ pub async fn add(
   expires_after: u64,     // authorization after this many seconds
   mainnet: bool,          // On mainnet (as opposed to testnet)?
 ) -> Result<String> {
-  let secondary_key: [u8; 32] =
-    match hex::decode(secondary_key.strip_prefix("0x").unwrap_or(secondary_key)) {
-      Ok(v) => v.as_slice().try_into()?,
-      Err(_) => bail!("expected 32-byte hexadecimal string as secondary key, got {secondary_key}"),
-    };
   // Get PairSigners for primary and secondary keys
   let primary_pair = match <Pair as sp_core::Pair>::from_string(primary_mnemonic, None) {
     Ok(pair) => pair,
     Err(_) => bail!("failed to convert mnemonic to SR25519 keypair"),
   };
   let mut primary_signer = PairSigner::new(primary_pair);
-  let secondary_pair = <Pair as sp_core::Pair>::from_seed(&secondary_key);
-  let secondary_signer = PairSigner::new(secondary_pair);
+  let secondary_signer = util::pairsigner_from_str(secondary_key)?;
 
   // Create an API instance with the desired node RPC URL
   let url = util::url(mainnet);

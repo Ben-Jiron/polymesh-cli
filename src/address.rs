@@ -1,18 +1,15 @@
+use anyhow::{bail, Result};
+
+use polymesh_api::client::{PairSigner, Signer};
 use sp_core::crypto::{Ss58AddressFormatRegistry, Ss58Codec};
 use sp_keyring::sr25519::sr25519::Pair;
 
-use polymesh_api::client::{PairSigner, Signer};
-
-use anyhow::{bail, Result};
+use crate::util;
 
 /// Generate a Polymesh public address using a 32-byte private key given as a
 /// hexadecimal string
 pub fn private_key_to_ss58check(priv_key: &str, mainnet: bool) -> Result<String> {
-  let priv_key: [u8; 32] = hex::decode(priv_key.strip_prefix("0x").unwrap_or(priv_key))?
-    .as_slice()
-    .try_into()?;
-  let pair = <Pair as sp_core::Pair>::from_seed(&priv_key);
-  let signer = PairSigner::new(pair);
+  let signer = util::pairsigner_from_str(priv_key)?;
   let addr = match mainnet {
     true => signer
       .account()

@@ -157,6 +157,23 @@ pub fn command() -> Command {
             ])
         )
         .subcommand(
+          Command::new("extra")
+            .about("Take the origin account as a stash, bonding an extra amount for staking rewards")
+            .short_flag('e')
+            .args(&[
+              arg!(key: -k --key <STASH_KEY> "The 32-byte hexadecimal signing key of stash")
+                .alias("stash")
+                .short_alias('s')
+                .required(true),
+              arg!(value: -v --value <VALUE> "The amount of the stash's balance (in POLYX) that will be locked up (with no upper limit on this amount)")
+                .alias("amount")
+                .short_alias('a')
+                .value_parser(value_parser!(f64))
+                .required(true),
+              arg!(mainnet: --mainnet "If set, performs action on mainnet").required(false),
+            ])
+        )
+        .subcommand(
           Command::new("withdraw")
             .about("Taking the origin as a controller, withdraw unbonded tokens (if the unbonding period has ended)")
             .short_flag('w')

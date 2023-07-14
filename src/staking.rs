@@ -2,9 +2,8 @@
 use anyhow::{Context, Result};
 
 use sp_core::crypto::{Ss58AddressFormatRegistry, Ss58Codec};
-use sp_keyring::sr25519::sr25519::Pair;
 
-use polymesh_api::client::{AccountId, MultiAddress, PairSigner};
+use polymesh_api::client::{AccountId, MultiAddress};
 use polymesh_api::types::pallet_staking::RewardDestination;
 use polymesh_api::Api;
 
@@ -15,10 +14,6 @@ use crate::util;
 /// [`EraElectionStatus`] is `Closed`.
 /// The dispatch origin for this call must be signed by the *controller*, not the stash.
 pub async fn nominate(controller_key: &str, operators: Vec<&str>, mainnet: bool) -> Result<String> {
-  let controller_key = util::decode_hex_key(controller_key)?;
-  let pair = <Pair as sp_core::Pair>::from_seed(&controller_key);
-  let mut signer = PairSigner::new(pair);
-
   let account_ids: Result<Vec<_>, _> = operators
     .iter()
     .map(|&ss58| AccountId::from_string(ss58))
@@ -33,6 +28,7 @@ pub async fn nominate(controller_key: &str, operators: Vec<&str>, mainnet: bool)
 
   let api = Api::new(util::url(mainnet)).await?;
   let call = api.call().staking().nominate(targets)?;
+  let mut signer = util::pairsigner_from_str(controller_key)?;
   util::sign_submit_and_watch(&api, &call, &mut signer).await
 }
 
@@ -44,37 +40,35 @@ pub async fn bond(
   value: u128,
   mainnet: bool,
 ) -> Result<String> {
-  let stash_key = util::decode_hex_key(stash_key)?;
-  let pair = <Pair as sp_core::Pair>::from_seed(&stash_key);
-  let mut signer = PairSigner::new(pair);
   let controller = MultiAddress::from(AccountId::from_string(controller_addr)?);
-
   let api = Api::new(util::url(mainnet)).await?;
   let call = api
     .call()
     .staking()
     .bond(controller, value, RewardDestination::Stash)?;
+  let mut signer = util::pairsigner_from_str(stash_key)?;
   util::sign_submit_and_watch(&api, &call, &mut signer).await
 }
 
 /// As a controller, unbond `value` micro-POLYX from being staked by stash.
 pub async fn unbond(controller_key: &str, value: u128, mainnet: bool) -> Result<String> {
-  let controller_key = util::decode_hex_key(controller_key)?;
-  let pair = <Pair as sp_core::Pair>::from_seed(&controller_key);
-  let mut signer = PairSigner::new(pair);
-
   let api = Api::new(util::url(mainnet)).await?;
   let call = api.call().staking().unbond(value)?;
+  let mut signer = util::pairsigner_from_str(controller_key)?;
+  util::sign_submit_and_watch(&api, &call, &mut signer).await
+}
+
+pub async fn bond_extra(stash_key: &str, amount: u128, mainnet: bool) -> Result<String> {
+  let api = Api::new(util::url(mainnet)).await?;
+  let call = api.call().staking().bond_extra(amount)?;
+  let mut signer = util::pairsigner_from_str(stash_key)?;
   util::sign_submit_and_watch(&api, &call, &mut signer).await
 }
 
 /// Withdraw unbonded tokens when [EraElectionStatus] is `Closed`.
 pub async fn withdraw_unbonded(controller_key: &str, mainnet: bool) -> Result<String> {
-  let controller_key = util::decode_hex_key(controller_key)?;
-  let pair = <Pair as sp_core::Pair>::from_seed(&controller_key);
-  let mut signer = PairSigner::new(pair);
   let api = Api::new(util::url(mainnet)).await?;
-
+  let mut signer = util::pairsigner_from_str(controller_key)?;
   let ledger = api
     .query()
     .staking()
@@ -96,31 +90,23 @@ pub async fn withdraw_unbonded(controller_key: &str, mainnet: bool) -> Result<St
 }
 
 pub async fn active_in_ledger(controller_key: &str, mainnet: bool) -> Result<u128> {
-  let controller_key = util::decode_hex_key(controller_key)?;
-  let pair = <Pair as sp_core::Pair>::from_seed(&controller_key);
-  let account = PairSigner::new(pair).account;
-  Ok(
-    Api::new(util::url(mainnet))
-      .await?
-      .query()
-      .staking()
-      .ledger(account)
-      .await?
-      .context("no ledger found")?
-      .active,
-  )
-}
-
-/// Get sum of all staking rewards
-pub async fn total_rewarded(controller_key: &str, mainnet: bool) -> Result<u32> {
-  let controller_key = util::decode_hex_key(controller_key)?;
-  let pair = <Pair as sp_core::Pair>::from_seed(&controller_key);
-  let signer = PairSigner::new(pair);
   let ledger = Api::new(util::url(mainnet))
     .await?
     .query()
     .staking()
-    .ledger(signer.account)
+    .ledger(util::pairsigner_from_str(controller_key)?.account)
+    .await?
+    .context("no ledger found")?;
+  Ok(ledger.active)
+}
+
+/// Get sum of all staking rewards
+pub async fn total_rewarded(controller_key: &str, mainnet: bool) -> Result<u32> {
+  let ledger = Api::new(util::url(mainnet))
+    .await?
+    .query()
+    .staking()
+    .ledger(util::pairsigner_from_str(controller_key)?.account)
     .await?
     .context("not a controller")?;
   Ok(ledger.claimed_rewards.iter().sum())
@@ -192,7 +178,7 @@ mod tests {
     let controller_key = "9173628750a527f9cdaa69ecbec47b11981299c4e47307b2d7df75a8b0f7d01f";
     let res = total_rewarded(controller_key, mainnet).await;
     assert!(res.is_ok());
-    println!("Rewards: {} POLYX", res.unwrap() as f64 * 1e-6);
-    assert!(false);
+    let rewards = res.unwrap();
+    println!("Rewards: {} POLYX", rewards as f64 * 1e-6);
   }
 }
