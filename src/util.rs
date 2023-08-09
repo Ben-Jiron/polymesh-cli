@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 use parity_scale_codec::Encode;
 use polymesh_api::client::{Era, Extra, ExtrinsicV4, PairSigner, SignedPayload, Signer};
@@ -28,6 +28,17 @@ pub fn decode_hex_key(key: &str) -> Result<[u8; 32]> {
 pub fn pairsigner_from_str(key: &str) -> Result<PairSigner<Pair>> {
   let key = decode_hex_key(key)?;
   let pair = <Pair as sp_core::Pair>::from_seed(&key);
+  Ok(PairSigner::new(pair))
+}
+
+pub fn pairsigner_from_mnemonic(
+  mnemonic: &str,
+  password: Option<&str>,
+) -> Result<PairSigner<Pair>> {
+  let pair = match <Pair as sp_core::Pair>::from_phrase(mnemonic, password) {
+    Ok((pair, _)) => pair,
+    Err(_) => bail!("failed to generate keypair from given mnemonic"),
+  };
   Ok(PairSigner::new(pair))
 }
 

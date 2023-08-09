@@ -157,6 +157,23 @@ pub fn command() -> Command {
             ])
         )
         .subcommand(
+          Command::new("unbond")
+            .about("As a controller, unbond an amount that has been bonded to you for staking.")
+            .short_flag('u')
+            .args(&[
+              arg!(key: -k --key <CONTROLLER_KEY> "The 32-byte hexadecimal signing key of controller")
+                .alias("controller")
+                .short_alias('c')
+                .required(true),
+              arg!(value: -v --value <VALUE> "The amount of the stash's balance (in POLYX) that will be unbonded")
+                .alias("amount")
+                .short_alias('a')
+                .value_parser(value_parser!(f64))
+                .required(true),
+              arg!(mainnet: --mainnet "If set, performs action on mainnet").required(false),
+            ])
+        )
+        .subcommand(
           Command::new("extra")
             .about("Take the origin account as a stash, bonding an extra amount for staking rewards")
             .short_flag('e')

@@ -65,6 +65,17 @@ pub async fn bond_extra(stash_key: &str, amount: u128, mainnet: bool) -> Result<
   util::sign_submit_and_watch(&api, &call, &mut signer).await
 }
 
+pub async fn bond_extra_with_mnemonic(
+  mnemonic: &str,
+  amount: u128,
+  mainnet: bool,
+) -> Result<String> {
+  let api = Api::new(util::url(mainnet)).await?;
+  let call = api.call().staking().bond_extra(amount)?;
+  let mut signer = util::pairsigner_from_mnemonic(mnemonic, None)?;
+  util::sign_submit_and_watch(&api, &call, &mut signer).await
+}
+
 /// Withdraw unbonded tokens when [EraElectionStatus] is `Closed`.
 pub async fn withdraw_unbonded(controller_key: &str, mainnet: bool) -> Result<String> {
   let api = Api::new(util::url(mainnet)).await?;
