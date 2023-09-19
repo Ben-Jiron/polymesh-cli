@@ -5,6 +5,7 @@ mod util;
 
 mod address;
 mod balance;
+mod did;
 mod secondary;
 mod signing;
 mod staking;
@@ -64,6 +65,15 @@ pub async fn run() -> Result<String> {
       }
     }
 
+    // Subcommand: did
+    Some(("did", sub_m)) => {
+      let mainnet = sub_m.get_flag("mainnet");
+      let addr = sub_m
+        .get_one::<String>("address")
+        .expect("required by command");
+      did::get_did(addr, mainnet).await?.to_string()
+    }
+
     // Subcommand: balance
     Some(("balance", sub_m)) => {
       let address = sub_m
@@ -75,7 +85,7 @@ pub async fn run() -> Result<String> {
       } else {
         balance::free(address, mainnet).await?
       };
-      format!("{}", bal)
+      format!("{bal}",)
     }
 
     // Subcommand: secondary (i.e. Secondary keys)

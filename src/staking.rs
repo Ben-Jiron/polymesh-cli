@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use anyhow::{Context, Result};
 
 use sp_core::crypto::{Ss58AddressFormatRegistry, Ss58Codec};
@@ -65,6 +64,7 @@ pub async fn bond_extra(stash_key: &str, amount: u128, mainnet: bool) -> Result<
   util::sign_submit_and_watch(&api, &call, &mut signer).await
 }
 
+#[allow(dead_code)]
 pub async fn bond_extra_with_mnemonic(
   mnemonic: &str,
   amount: u128,
@@ -100,6 +100,7 @@ pub async fn withdraw_unbonded(controller_key: &str, mainnet: bool) -> Result<St
   util::sign_submit_and_watch(&api, &call, &mut signer).await
 }
 
+#[allow(dead_code)]
 pub async fn active_in_ledger(controller_key: &str, mainnet: bool) -> Result<u128> {
   let ledger = Api::new(util::url(mainnet))
     .await?
@@ -112,6 +113,7 @@ pub async fn active_in_ledger(controller_key: &str, mainnet: bool) -> Result<u12
 }
 
 /// Get sum of all staking rewards
+#[allow(dead_code)]
 pub async fn total_rewarded(controller_key: &str, mainnet: bool) -> Result<u32> {
   let ledger = Api::new(util::url(mainnet))
     .await?

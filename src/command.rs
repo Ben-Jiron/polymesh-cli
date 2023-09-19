@@ -71,6 +71,16 @@ pub fn command() -> Command {
         ])
     )
 
+    // Subcommand: DID
+    .subcommand(
+      Command::new("did")
+        .about("Get the DID associated with an address")
+        .args(&[
+          arg!(address: "SS58-formatted public address (starts with 5 on testnet or 2 on mainnet)").required(true),
+          arg!(mainnet: --mainnet "If set, returns mainnet address (starting with 2)").required(false),
+        ])
+    )
+
     // Subcommand: secondary
     .subcommand(
       Command::new("secondary")

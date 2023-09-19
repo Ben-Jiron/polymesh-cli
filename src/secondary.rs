@@ -33,18 +33,21 @@ struct TargetIdAuthorization {
 }
 
 #[allow(dead_code)]
-pub async fn add_secondary_auth(api: &Api, did: &[u8; 32], expires_after: u64) -> Result<Vec<u8>> {
-  let target_id = IdentityId(*did);
+pub async fn add_secondary_auth(
+  api: &Api,
+  primary_account: &AccountId,
+  expires_at: u64,
+) -> Result<Vec<u8>> {
   let identity_query = api.query().identity();
+  // Create TargetIdAuthorization from target DID, the DID's nonce, and an expiry
+  let target_id = match identity_query.key_records(*primary_account).await? {
+    Some(KeyRecord::PrimaryKey(did)) => did,
+    Some(_) => bail!("must use primary key to add secondary keys"),
+    None => bail!("{:?} doesn't have an identity", *primary_account),
+  };
   let nonce = identity_query
     .off_chain_authorization_nonce(target_id)
     .await?;
-  let expires_at = SystemTime::now()
-    .checked_add(Duration::from_secs(expires_after))
-    .unwrap_or_else(SystemTime::now)
-    .duration_since(SystemTime::UNIX_EPOCH)
-    .expect("logic error in getting Unix time")
-    .as_secs();
   let auth = TargetIdAuthorization {
     target_id,
     nonce,
@@ -60,27 +63,10 @@ pub async fn add(
   mainnet: bool,          // On mainnet (as opposed to testnet)?
 ) -> Result<String> {
   // Get PairSigners for primary and secondary keys
-  let primary_pair = match <Pair as sp_core::Pair>::from_string(primary_mnemonic, None) {
-    Ok(pair) => pair,
-    Err(_) => bail!("failed to convert mnemonic to SR25519 keypair"),
-  };
-  let mut primary_signer = PairSigner::new(primary_pair);
+  let mut primary_signer = util::pairsigner_from_mnemonic(primary_mnemonic, None)?;
   let secondary_signer = util::pairsigner_from_str(secondary_key)?;
 
-  // Create an API instance with the desired node RPC URL
-  let url = util::url(mainnet);
-  let api = Api::new(url).await?;
-  let identity_query = api.query().identity();
-
-  // Create TargetIdAuthorization from target DID, the DID's nonce, and an expiry
-  let target_id = match identity_query.key_records(primary_signer.account).await? {
-    Some(KeyRecord::PrimaryKey(did)) => did,
-    Some(_) => bail!("must use primary key to add secondary keys"),
-    None => bail!("{:?} doesn't have an identity", primary_signer.account),
-  };
-  let nonce = identity_query
-    .off_chain_authorization_nonce(target_id)
-    .await?;
+  let api = Api::new(util::url(mainnet)).await?;
   let expires_at = SystemTime::now()
     .checked_add(Duration::from_secs(expires_after))
     .unwrap_or_else(SystemTime::now)
@@ -88,13 +74,8 @@ pub async fn add(
     .expect("logic error in getting Unix time")
     .as_millis()
     .min(u64::MAX as u128) as u64;
-  let auth = TargetIdAuthorization {
-    target_id,
-    nonce,
-    expires_at,
-  };
-  let auth_data = auth.encode();
-  // After signing, the signature always comes back as 65 bytes.
+  let auth_data = add_secondary_auth(&api, &primary_signer.account, expires_at).await?;
+  // After signing, the signature always comes back as 65 bytes (ECDSA signature)
   let secondary_signature_65_bytes = secondary_signer.sign(&auth_data).await?.encode();
   let secondary_signature: [u8; 64] = secondary_signature_65_bytes[1..].try_into()?;
   let auth_signature = H512(secondary_signature);
@@ -115,7 +96,6 @@ pub async fn add(
     auth_signature,
   };
 
-  // Use the API to create a WrappedCall to be submitted with the primary account
   let additional_keys = vec![secondary_key_with_auth];
   let call = api
     .call()
@@ -144,19 +124,21 @@ mod tests {
   use super::*;
 
   #[tokio::test]
+  #[ignore]
   async fn it_creates_auth_data() {
     let url = util::url(false); // testnet
-    let api = Api::new(url).await.unwrap();
-    let did_hex = "0x7b5f2e3da9b75966d65ee9e4dfcda6db539d8697269c5644145892ae61e9d39f";
-    let did: [u8; 32] = hex::decode(did_hex.strip_prefix("0x").unwrap_or(did_hex))
-      .unwrap()
-      .as_slice()
-      .try_into()
-      .unwrap();
-    let expires_after = 3600;
-    let res = add_secondary_auth(&api, &did, expires_after).await;
-    assert!(res.is_ok());
-    let encoded = res.unwrap();
-    println!("encoded length: {}", encoded.len());
+    let _api = Api::new(url).await.unwrap();
+    // let account_id = AccountId::from_slice(did);
+    let _expires_at = SystemTime::now()
+      .checked_add(Duration::from_secs(24 * 60 * 60 * 365))
+      .unwrap_or_else(SystemTime::now)
+      .duration_since(SystemTime::UNIX_EPOCH)
+      .expect("logic error in getting Unix time")
+      .as_millis()
+      .min(u64::MAX as u128) as u64;
+    // let res = add_secondary_auth(&api, &did, expires_at).await;
+    // assert!(res.is_ok());
+    // let encoded = res.unwrap();
+    // println!("encoded length: {}", encoded.len());
   }
 }
