@@ -1,24 +1,27 @@
-use anyhow::Result;
-
-use polymesh_api::client::AccountId;
-use polymesh_api::Api;
-use sp_core::crypto::Ss58Codec;
-
 use crate::util;
+use anyhow::Result;
+use polymesh_api::{
+  client::{sp_core::crypto::Ss58Codec, AccountId},
+  Api,
+};
 
 pub async fn free(addr: &str, mainnet: bool) -> Result<u128> {
-  let account = AccountId::from_string(addr)?;
-  let url = util::url(mainnet);
-  let api = Api::new(url).await?;
-  let account_info = api.query().system().account(account).await?;
+  let account_info = Api::new(util::url(mainnet))
+    .await?
+    .query()
+    .system()
+    .account(AccountId::from_string(addr)?)
+    .await?;
   Ok(account_info.data.free)
 }
 
 pub async fn staked(addr: &str, mainnet: bool) -> Result<u128> {
-  let account = AccountId::from_string(addr)?;
-  let url = util::url(mainnet);
-  let api = Api::new(url).await?;
-  let account_info = api.query().system().account(account).await?;
+  let account_info = Api::new(util::url(mainnet))
+    .await?
+    .query()
+    .system()
+    .account(AccountId::from_string(addr)?)
+    .await?;
   Ok(account_info.data.reserved)
 }
 

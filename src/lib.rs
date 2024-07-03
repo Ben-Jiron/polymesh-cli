@@ -5,7 +5,6 @@ mod util;
 
 mod address;
 mod balance;
-mod did;
 mod secondary;
 mod signing;
 mod staking;
@@ -63,15 +62,6 @@ pub async fn run() -> Result<String> {
           address::private_key_to_ss58check(key, mainnet)?
         }
       }
-    }
-
-    // Subcommand: did
-    Some(("did", sub_m)) => {
-      let mainnet = sub_m.get_flag("mainnet");
-      let addr = sub_m
-        .get_one::<String>("address")
-        .expect("required by command");
-      did::get_did(addr, mainnet).await?.to_string()
     }
 
     // Subcommand: balance

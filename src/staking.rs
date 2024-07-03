@@ -1,12 +1,13 @@
-use anyhow::{Context, Result};
-
-use sp_core::crypto::{Ss58AddressFormatRegistry, Ss58Codec};
-
-use polymesh_api::client::{AccountId, MultiAddress};
-use polymesh_api::types::pallet_staking::RewardDestination;
-use polymesh_api::Api;
-
 use crate::util;
+use anyhow::{Context, Result};
+use polymesh_api::{
+  client::{
+    sp_core::crypto::{Ss58AddressFormatRegistry, Ss58Codec},
+    AccountId, MultiAddress,
+  },
+  types::pallet_staking::RewardDestination,
+  Api,
+};
 
 /// Declare to nominate `targets` for the origin controller.
 /// Effects will only be felt at the beginning of the next era. This can only be called when
@@ -24,11 +25,13 @@ pub async fn nominate(controller_key: &str, operators: Vec<&str>, mainnet: bool)
     .iter()
     .map(|&id| MultiAddress::from(id))
     .collect();
-
-  let api = Api::new(util::url(mainnet)).await?;
-  let call = api.call().staking().nominate(targets)?;
-  let mut signer = util::pairsigner_from_str(controller_key)?;
-  util::sign_submit_and_watch(&api, &call, &mut signer).await
+  let call = Api::new(util::url(mainnet))
+    .await?
+    .call()
+    .staking()
+    .nominate(targets)?;
+  let mut signer = util::pairsigner_from_private_key(controller_key)?;
+  util::sign_submit_and_watch(&call, &mut signer).await
 }
 
 /// Take the origin account as a stash and lock up `value` of its balance.
@@ -39,29 +42,35 @@ pub async fn bond(
   value: u128,
   mainnet: bool,
 ) -> Result<String> {
-  let controller = MultiAddress::from(AccountId::from_string(controller_addr)?);
-  let api = Api::new(util::url(mainnet)).await?;
-  let call = api
-    .call()
-    .staking()
-    .bond(controller, value, RewardDestination::Stash)?;
-  let mut signer = util::pairsigner_from_str(stash_key)?;
-  util::sign_submit_and_watch(&api, &call, &mut signer).await
+  let call = Api::new(util::url(mainnet)).await?.call().staking().bond(
+    MultiAddress::from(AccountId::from_string(controller_addr)?),
+    value,
+    RewardDestination::Stash,
+  )?;
+  let mut signer = util::pairsigner_from_private_key(stash_key)?;
+  util::sign_submit_and_watch(&call, &mut signer).await
 }
 
 /// As a controller, unbond `value` micro-POLYX from being staked by stash.
+#[allow(dead_code)]
 pub async fn unbond(controller_key: &str, value: u128, mainnet: bool) -> Result<String> {
-  let api = Api::new(util::url(mainnet)).await?;
-  let call = api.call().staking().unbond(value)?;
-  let mut signer = util::pairsigner_from_str(controller_key)?;
-  util::sign_submit_and_watch(&api, &call, &mut signer).await
+  let call = Api::new(util::url(mainnet))
+    .await?
+    .call()
+    .staking()
+    .unbond(value)?;
+  let mut signer = util::pairsigner_from_private_key(controller_key)?;
+  util::sign_submit_and_watch(&call, &mut signer).await
 }
 
 pub async fn bond_extra(stash_key: &str, amount: u128, mainnet: bool) -> Result<String> {
-  let api = Api::new(util::url(mainnet)).await?;
-  let call = api.call().staking().bond_extra(amount)?;
-  let mut signer = util::pairsigner_from_str(stash_key)?;
-  util::sign_submit_and_watch(&api, &call, &mut signer).await
+  let call = Api::new(util::url(mainnet))
+    .await?
+    .call()
+    .staking()
+    .bond_extra(amount)?;
+  let mut signer = util::pairsigner_from_private_key(stash_key)?;
+  util::sign_submit_and_watch(&call, &mut signer).await
 }
 
 #[allow(dead_code)]
@@ -73,13 +82,13 @@ pub async fn bond_extra_with_mnemonic(
   let api = Api::new(util::url(mainnet)).await?;
   let call = api.call().staking().bond_extra(amount)?;
   let mut signer = util::pairsigner_from_mnemonic(mnemonic, None)?;
-  util::sign_submit_and_watch(&api, &call, &mut signer).await
+  util::sign_submit_and_watch(&call, &mut signer).await
 }
 
 /// Withdraw unbonded tokens when [EraElectionStatus] is `Closed`.
 pub async fn withdraw_unbonded(controller_key: &str, mainnet: bool) -> Result<String> {
   let api = Api::new(util::url(mainnet)).await?;
-  let mut signer = util::pairsigner_from_str(controller_key)?;
+  let mut signer = util::pairsigner_from_private_key(controller_key)?;
   let ledger = api
     .query()
     .staking()
@@ -97,7 +106,7 @@ pub async fn withdraw_unbonded(controller_key: &str, mainnet: bool) -> Result<St
   };
 
   let call = api.call().staking().withdraw_unbonded(num_slashing_spans)?;
-  util::sign_submit_and_watch(&api, &call, &mut signer).await
+  util::sign_submit_and_watch(&call, &mut signer).await
 }
 
 #[allow(dead_code)]
@@ -106,7 +115,7 @@ pub async fn active_in_ledger(controller_key: &str, mainnet: bool) -> Result<u12
     .await?
     .query()
     .staking()
-    .ledger(util::pairsigner_from_str(controller_key)?.account)
+    .ledger(util::pairsigner_from_private_key(controller_key)?.account)
     .await?
     .context("no ledger found")?;
   Ok(ledger.active)
@@ -119,7 +128,7 @@ pub async fn total_rewarded(controller_key: &str, mainnet: bool) -> Result<u32> 
     .await?
     .query()
     .staking()
-    .ledger(util::pairsigner_from_str(controller_key)?.account)
+    .ledger(util::pairsigner_from_private_key(controller_key)?.account)
     .await?
     .context("not a controller")?;
   Ok(ledger.claimed_rewards.iter().sum())
@@ -127,14 +136,19 @@ pub async fn total_rewarded(controller_key: &str, mainnet: bool) -> Result<u32> 
 
 /// The AccountIds (public) of validator nodes
 pub async fn validators(mainnet: bool) -> Result<Vec<String>> {
-  let api = Api::new(util::url(mainnet)).await?;
-  let account_ids = api.query().session().validators().await?;
-  let operators = match mainnet {
-    true => account_ids
+  let account_ids = Api::new(util::url(mainnet))
+    .await?
+    .query()
+    .session()
+    .validators()
+    .await?;
+  let operators = if mainnet {
+    account_ids
       .iter()
       .map(|id| id.to_ss58check_with_version(Ss58AddressFormatRegistry::PolymeshAccount.into()))
-      .collect(),
-    false => account_ids.iter().map(|id| id.to_ss58check()).collect(),
+      .collect()
+  } else {
+    account_ids.iter().map(|id| id.to_ss58check()).collect()
   };
   Ok(operators)
 }

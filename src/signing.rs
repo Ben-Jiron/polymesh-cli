@@ -1,12 +1,12 @@
-use anyhow::{bail, Result};
-
-use parity_scale_codec::Encode;
-use polymesh_api::client::Signer;
-use sp_core::crypto::Ss58Codec;
-use sp_keyring::sr25519::sr25519::{Public, Signature};
-use sp_runtime::{traits::Verify, MultiSignature};
-
+#![allow(unused_imports, unused_variables)]
 use crate::util;
+use anyhow::Result;
+use parity_scale_codec::Encode;
+use polymesh_api::client::{
+  sp_core::crypto::Ss58Codec,
+  sp_core::sr25519::{Public, Signature},
+  Signer,
+};
 
 /// Using a private key (given as a 32-byte hexadecimal string without a `0x` prefix)
 /// and a payload (given as a hexadecimal string without a `0x` prefix), this function
@@ -14,11 +14,9 @@ use crate::util;
 /// validated against the user's public address (a base-64 encoded address starting with 5).
 pub async fn sign_payload(signing_key: &str, payload: &str) -> Result<String> {
   let payload = hex::decode(payload.strip_prefix("0x").unwrap_or(payload))?;
-  let signer = util::pairsigner_from_str(signing_key)?;
-  match signer.sign(&payload).await? {
-    MultiSignature::Sr25519(sig) => Ok(hex::encode(sig.encode())),
-    _ => bail!("only SR25519 signatures supported"),
-  }
+  let signer = util::pairsigner_from_private_key(signing_key)?;
+  let res = signer.sign(&payload).await?;
+  Ok(hex::encode(res.encode()))
 }
 
 /// Verify a signature against a payload and its signer's public address
@@ -26,13 +24,14 @@ pub fn verify_signature(signature: &str, ss58_addr: &str, payload: &str) -> bool
   let signature =
     hex::decode(signature.strip_prefix("0x").unwrap_or(signature)).unwrap_or_default();
   let payload = hex::decode(payload.strip_prefix("0x").unwrap_or(payload)).unwrap_or_default();
-  match (
-    Signature::from_slice(&signature),
-    Public::from_ss58check(ss58_addr),
-  ) {
-    (Some(sig), Ok(public)) => sig.verify(&payload[..], &public),
-    _ => false,
-  }
+  todo!()
+  // match (
+  //   Signature::from_slice(&signature),
+  //   Public::from_ss58check(ss58_addr),
+  // ) {
+  //   (Some(sig), Ok(public)) => public. sig.verify(&payload[..], &public),
+  //   _ => false,
+  // }
 }
 
 #[cfg(test)]

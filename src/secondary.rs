@@ -1,23 +1,19 @@
-use anyhow::{bail, Result};
-
-use parity_scale_codec::{Decode, Encode};
-use sp_core::crypto::Ss58Codec;
-use sp_keyring::sr25519::sr25519::Pair;
-
-use polymesh_api::client::{AccountId, IdentityId, PairSigner, Signer};
-use polymesh_api::types::{
-  polymesh_common_utilities::traits::identity::SecondaryKeyWithAuth,
-  polymesh_primitives::{
-    secondary_key::{KeyRecord, Permissions, SecondaryKey},
-    subset::SubsetRestriction,
-  },
-  primitive_types::H512,
-};
-use polymesh_api::Api;
-
-use std::time::{Duration, SystemTime};
-
 use crate::util;
+use anyhow::{bail, Result};
+use parity_scale_codec::{Decode, Encode};
+use polymesh_api::{
+  client::{sp_core::crypto::Ss58Codec, AccountId, IdentityId, Signer},
+  types::{
+    polymesh_common_utilities::traits::identity::SecondaryKeyWithAuth,
+    polymesh_primitives::{
+      secondary_key::{KeyRecord, Permissions, SecondaryKey},
+      subset::SubsetRestriction,
+    },
+    primitive_types::H512,
+  },
+  Api,
+};
+use std::time::{Duration, SystemTime};
 
 pub type Moment = u64;
 pub type AuthorizationNonce = u64;
@@ -32,7 +28,6 @@ struct TargetIdAuthorization {
   pub expires_at: Moment,
 }
 
-#[allow(dead_code)]
 pub async fn add_secondary_auth(
   api: &Api,
   primary_account: &AccountId,
@@ -64,9 +59,10 @@ pub async fn add(
 ) -> Result<String> {
   // Get PairSigners for primary and secondary keys
   let mut primary_signer = util::pairsigner_from_mnemonic(primary_mnemonic, None)?;
-  let secondary_signer = util::pairsigner_from_str(secondary_key)?;
-
+  let secondary_signer = util::pairsigner_from_private_key(secondary_key)?;
   let api = Api::new(util::url(mainnet)).await?;
+
+  // Create TargetIdAuthorization from target DID, the DID's nonce, and an expiry
   let expires_at = SystemTime::now()
     .checked_add(Duration::from_secs(expires_after))
     .unwrap_or_else(SystemTime::now)
@@ -101,22 +97,19 @@ pub async fn add(
     .call()
     .identity()
     .add_secondary_keys_with_authorization(additional_keys, expires_at)?;
-  util::sign_submit_and_watch(&api, &call, &mut primary_signer).await
+  util::sign_submit_and_watch(&call, &mut primary_signer).await
 }
 
 /// Removes secondary key from account
 pub async fn remove(primary_mnemonic: &str, who: &str, mainnet: bool) -> Result<String> {
   let who = AccountId::from_ss58check(who)?;
-  let pair = match <Pair as sp_core::Pair>::from_string(primary_mnemonic, None) {
-    Ok(pair) => pair,
-    Err(_) => bail!("failed to convert mnemonic to SR25519 keypair"),
-  };
-  let mut signer = PairSigner::new(pair);
-
-  let url = util::url(mainnet);
-  let api = Api::new(url).await?;
-  let call = api.call().identity().remove_secondary_keys(vec![who])?;
-  util::sign_submit_and_watch(&api, &call, &mut signer).await
+  let call = Api::new(util::url(mainnet))
+    .await?
+    .call()
+    .identity()
+    .remove_secondary_keys(vec![who])?;
+  let mut signer = util::pairsigner_from_mnemonic(primary_mnemonic, None)?;
+  util::sign_submit_and_watch(&call, &mut signer).await
 }
 
 #[cfg(test)]

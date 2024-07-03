@@ -1,7 +1,7 @@
 #[tokio::main]
 async fn main() {
   match polymesh_cli::run().await {
-    Ok(tx_hash) => println!("{}", tx_hash),
+    Ok(res) => println!("{}", res),
     Err(e) => {
       eprintln!("{}", e);
       std::process::exit(1);

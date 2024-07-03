@@ -1,41 +1,33 @@
-use anyhow::{bail, Result};
-
-use polymesh_api::client::{PairSigner, Signer};
-use sp_core::crypto::{Ss58AddressFormatRegistry, Ss58Codec};
-use sp_keyring::sr25519::sr25519::Pair;
-
 use crate::util;
+use anyhow::Result;
+use polymesh_api::client::{
+  sp_core::crypto::{Ss58AddressFormatRegistry, Ss58Codec},
+  Signer,
+};
 
-/// Generate a Polymesh public address using a 32-byte private key given as a
-/// hexadecimal string
-pub fn private_key_to_ss58check(priv_key: &str, mainnet: bool) -> Result<String> {
-  let signer = util::pairsigner_from_str(priv_key)?;
-  let addr = match mainnet {
-    true => signer
+fn signer_ss58check(signer: &impl Signer, mainnet: bool) -> String {
+  if mainnet {
+    signer
       .account()
-      .to_ss58check_with_version(Ss58AddressFormatRegistry::PolymeshAccount.into()),
-    false => signer.account().to_ss58check(),
-  };
-  Ok(addr)
+      .to_ss58check_with_version(Ss58AddressFormatRegistry::PolymeshAccount.into())
+  } else {
+    signer.account().to_ss58check()
+  }
+}
+
+/// Generate a Polymesh public address using a 32-byte private key given as a hexadecimal string
+pub fn private_key_to_ss58check(priv_key: &str, mainnet: bool) -> Result<String> {
+  let signer = util::pairsigner_from_private_key(priv_key)?;
+  Ok(signer_ss58check(&signer, mainnet))
 }
 
 pub fn mnemonic_to_ss58check(
   mnemonic: &str,
   mainnet: bool,
-  password: Option<&str>,
+  password_override: Option<&str>,
 ) -> Result<String> {
-  let pair = match <Pair as sp_core::Pair>::from_phrase(mnemonic, password) {
-    Ok((pair, _)) => pair,
-    Err(_) => bail!(format!("Invalid 12-word BIP39 mnemonic: {mnemonic}")),
-  };
-  let signer = PairSigner::new(pair);
-  let addr = match mainnet {
-    true => signer
-      .account()
-      .to_ss58check_with_version(Ss58AddressFormatRegistry::PolymeshAccount.into()),
-    false => signer.account().to_ss58check(),
-  };
-  Ok(addr)
+  let signer = util::pairsigner_from_mnemonic(mnemonic, password_override)?;
+  Ok(signer_ss58check(&signer, mainnet))
 }
 
 #[cfg(test)]

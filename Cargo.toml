@@ -8,9 +8,9 @@ anyhow = "1.0.66"
 clap = "4.0.29"
 hex = "0.4.3"
 tokio = { version = "1.21.0", features = ["full"] }
-polymesh-api = "0.2.0"
 parity-scale-codec = "3.2.1"
 sp-core = "6.0.0"
 sp-keyring = "6.0.0"
 sp-runtime = "6.0.0"
+polymesh-api = "3.7.0"
 
