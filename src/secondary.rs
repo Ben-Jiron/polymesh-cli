@@ -15,8 +15,8 @@ use polymesh_api::{
 };
 use std::time::{Duration, SystemTime};
 
-pub type Moment = u64;
-pub type AuthorizationNonce = u64;
+type Moment = u64;
+type AuthorizationNonce = u64;
 
 /// TargetIdAuthorization for adding a secondary key to a DID
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
@@ -28,7 +28,7 @@ struct TargetIdAuthorization {
   pub expires_at: Moment,
 }
 
-pub async fn add_secondary_auth(
+async fn add_secondary_auth(
   api: &Api,
   primary_account: &AccountId,
   expires_at: u64,
